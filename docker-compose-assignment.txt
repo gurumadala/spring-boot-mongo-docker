@@ -1,0 +1,48 @@
+node {
+    def buildNumber = BUILD_NUMBER
+    def buidServerIP="65.2.35.165"
+    
+    stage("git clone"){
+		git credentialsId: 'gurumadala', url: 'https://github.com/gurumadala/spring-boot-mongo-docker.git'
+    }
+    stage("maven clean package"){
+       def mavenHome= tool name: "maven3.6.3", type: "maven"
+       sh "${mavenHome}/bin/mvn clean package"
+    }
+    stage("Build Docker Image"){
+        //sh "usermod -aG docker $USER"
+        //sh "$USER"
+        //sh "sudo usermod -aG docker $USER"
+        sh "docker build -t gurumadala/spring-boot-app:${buildNumber} ."
+        //sh "docker run -d --name spring-boot-app -p 8081:8080 gurumadala/spring-boot-app:${buildNumber}"
+    }
+   
+    stage("Docker login and push"){
+      withCredentials([usernameColonPassword(credentialsId: '8eaf86ef-b3bb-4fdc-8582-436c6fdd1de2', variable: 'dokcerHubCredentials')]) {
+            sh "docker push gurumadala/spring-boot-app:${buildNumber}"
+      }
+    }
+   
+   stage ('dockerDeploy using docker-compose'){
+        sshagent(['5e2381e7-db9a-4395-a848-4532f36dacb5']) {
+       
+        // Deleting the existing containers
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@${buidServerIP} docker rm -f ubuntu_springboot_1 || true"
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@${buidServerIP} docker rm -f ubuntu_mongo_1 || true"
+       
+        //copying the docker files to remote
+        sh "echo ${buidServerIP}"
+        sh "scp -o StrictHostKeyChecking=no docker-compose.yml docker-compose_dev.yml  ubuntu@${buidServerIP}:"
+	
+		//replacing the build number
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@${buidServerIP} sed -i 's/BUILD_NUMBER/${buildNumber}/g' docker-compose.yml"
+	
+		//docker config
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@${buidServerIP} docker-compose -f docker-compose.yml -f docker-compose_dev.yml config"
+	
+		//docker containers
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@${buidServerIP} docker-compose -f docker-compose.yml -f docker-compose_dev.yml up -d"
+        
+        }
+    }
+}
