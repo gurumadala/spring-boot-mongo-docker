@@ -26,7 +26,7 @@ spec:
       - image: dockerhandson/spring-boot-mongo
         name: springboot
         ports:
-        - containerPort: 8080  
+        - containerPort: 8081 
         env:
         - name: MONGO_DB_HOSTNAME
           value: mongo
@@ -49,8 +49,8 @@ metadata:
 spec:
   type: NodePort
   ports:
-    - port: 8080
-      targetPort: 8080
+    - port: 8081
+      targetPort: 8081
   selector:
     app: springboot
 ---
